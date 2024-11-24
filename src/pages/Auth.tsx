@@ -1,14 +1,35 @@
-import TextField from '@mui/material/TextField';
+import { zodResolver } from '@hookform/resolvers/zod';
 import Button from '@mui/material/Button';
+import TextField from '@mui/material/TextField';
+import { Controller, SubmitHandler, useForm } from 'react-hook-form';
 import { Link, useLocation } from 'react-router';
+import { z } from 'zod';
+import { AuthSchemas } from '../schemas';
 
-function Auth() {
+export default function Auth() {
   const { pathname } = useLocation();
+  const formSchema = AuthSchemas[pathname.slice(1) as keyof typeof AuthSchemas];
+
+  const {
+    control,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      email: '',
+      password: '',
+    },
+  });
+
+  const onSubmit: SubmitHandler<z.infer<typeof formSchema>> = (data) => {
+    console.log(data);
+  };
 
   return (
     <div className="w-screen h-screen flex items-center justify-center">
       <div className="w-[400px] p-8 bg-slate-50 rounded-md">
-        <form className="">
+        <form onSubmit={handleSubmit(onSubmit)} noValidate>
           <h1 className="text-center mb-12">To-do List</h1>
           <h2 className="text-3xl font-light mb-4">
             {pathname === '/login' && 'ログイン'}
@@ -17,28 +38,63 @@ function Auth() {
           </h2>
 
           <div className="flex flex-col gap-5 mb-2">
-            <TextField
-              type="email"
-              fullWidth
-              label="メールアドレス"
-              variant="outlined"
+            <Controller
+              name="email"
+              control={control}
+              render={({ field }) => (
+                <TextField
+                  type="email"
+                  fullWidth
+                  label="メールアドレス"
+                  variant="outlined"
+                  error={!!errors.email}
+                  helperText={errors.email?.message}
+                  {...field}
+                />
+              )}
             />
 
             {pathname !== '/reset-password' && (
-              <TextField
-                type="password"
-                fullWidth
-                label="パスワード"
-                variant="outlined"
+              <Controller
+                name="password"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    type="password"
+                    fullWidth
+                    label="パスワード"
+                    variant="outlined"
+                    error={'password' in errors && !!errors.password}
+                    helperText={
+                      'password' in errors ? errors.password?.message : ''
+                    }
+                    {...field}
+                  />
+                )}
               />
             )}
 
             {pathname === '/sign-up' && (
-              <TextField
-                type="password"
-                fullWidth
-                label="パスワード（確認用）"
-                variant="outlined"
+              <Controller
+                name="confirmPassword"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    type="password"
+                    fullWidth
+                    label="パスワード（確認用）"
+                    variant="outlined"
+                    error={
+                      'confirmPassword' in errors && !!errors.confirmPassword
+                    }
+                    helperText={
+                      'confirmPassword' in errors
+                        ? errors.confirmPassword?.message
+                        : ''
+                    }
+                    {...field}
+                  />
+                )}
               />
             )}
           </div>
@@ -49,7 +105,13 @@ function Auth() {
             </Link>
           )}
 
-          <Button fullWidth size="large" variant="contained" sx={{ mt: 3 }}>
+          <Button
+            type="submit"
+            fullWidth
+            size="large"
+            variant="contained"
+            sx={{ mt: 3 }}
+          >
             続ける
           </Button>
 
@@ -69,5 +131,3 @@ function Auth() {
     </div>
   );
 }
-
-export default Auth;
