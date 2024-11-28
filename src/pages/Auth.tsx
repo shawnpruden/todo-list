@@ -1,16 +1,22 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
+import { useEffect } from 'react';
 import { Controller, SubmitHandler, useForm } from 'react-hook-form';
 import { Link, useLocation } from 'react-router';
 import { z } from 'zod';
+import useAuth from '../hooks/useAuth';
 import { AuthSchemas } from '../schemas';
 
 export default function Auth() {
   const { pathname } = useLocation();
-  const formSchema = AuthSchemas[pathname.slice(1) as keyof typeof AuthSchemas];
+  const action = pathname.slice(1);
+  const formSchema = AuthSchemas[action as keyof typeof AuthSchemas];
+
+  const { isLoading, handleSignup, handleLogin, handleReset } = useAuth();
 
   const {
+    reset,
     control,
     handleSubmit,
     formState: { errors },
@@ -22,8 +28,27 @@ export default function Auth() {
     },
   });
 
-  const onSubmit: SubmitHandler<z.infer<typeof formSchema>> = (data) => {
-    console.log(data);
+  useEffect(() => {
+    reset();
+  }, [pathname, reset]);
+
+  const onSubmit: SubmitHandler<z.infer<typeof formSchema>> = (values) => {
+    switch (action) {
+      case 'sign-up':
+        handleSignup(values as z.infer<(typeof AuthSchemas)['sign-up']>);
+        break;
+
+      case 'login':
+        handleLogin(values as z.infer<typeof AuthSchemas.login>);
+        break;
+
+      case 'reset-password':
+        handleReset(values as z.infer<(typeof AuthSchemas)['reset-password']>);
+        break;
+
+      default:
+        break;
+    }
   };
 
   return (
@@ -32,9 +57,9 @@ export default function Auth() {
         <form onSubmit={handleSubmit(onSubmit)} noValidate>
           <h1 className="text-center mb-12">To-do List</h1>
           <h2 className="text-3xl font-light mb-4">
-            {pathname === '/login' && 'ログイン'}
-            {pathname === '/sign-up' && '新規登録'}
-            {pathname === '/reset-password' && 'パスワード再設定'}
+            {action === 'login' && 'ログイン'}
+            {action === 'sign-up' && '新規登録'}
+            {action === 'reset-password' && 'パスワード再設定'}
           </h2>
 
           <div className="flex flex-col gap-5 mb-2">
@@ -54,7 +79,7 @@ export default function Auth() {
               )}
             />
 
-            {pathname !== '/reset-password' && (
+            {action !== 'reset-password' && (
               <Controller
                 name="password"
                 control={control}
@@ -74,7 +99,7 @@ export default function Auth() {
               />
             )}
 
-            {pathname === '/sign-up' && (
+            {action === 'sign-up' && (
               <Controller
                 name="confirmPassword"
                 control={control}
@@ -99,7 +124,7 @@ export default function Auth() {
             )}
           </div>
 
-          {pathname === '/login' && (
+          {action === 'login' && (
             <Link to="/reset-password" className="text-sm">
               パスワードをお忘れですか？
             </Link>
@@ -110,6 +135,7 @@ export default function Auth() {
             fullWidth
             size="large"
             variant="contained"
+            disabled={isLoading}
             sx={{ mt: 3 }}
           >
             続ける
@@ -117,13 +143,13 @@ export default function Auth() {
 
           <p className="text-sm mt-4">
             <span>
-              {pathname === '/sign-up'
+              {action === 'sign-up'
                 ? '既にアカウントをお持ちですか？'
                 : 'アカウントは未登録ですか？'}
             </span>
             &nbsp;
-            <Link to={pathname === '/sign-up' ? '/login' : '/sign-up'}>
-              {pathname === '/sign-up' ? 'ログイン' : '新規登録'}
+            <Link to={action === 'sign-up' ? '/login' : '/sign-up'}>
+              {action === 'sign-up' ? 'ログイン' : '新規登録'}
             </Link>
           </p>
         </form>

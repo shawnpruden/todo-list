@@ -18,13 +18,26 @@ import {
 } from 'react';
 import { useNavigate } from 'react-router';
 import { auth, db } from '../firebase';
+import { z } from 'zod';
+import { AuthSchemas } from '../schemas';
+import { toast } from 'sonner';
 
-const AuthContext = createContext<unknown>(null);
+type AuthContextType = {
+  isLoading: boolean;
+  user: User | null;
+  handleSignup: (values: z.infer<(typeof AuthSchemas)['sign-up']>) => void;
+  handleLogin: (values: z.infer<typeof AuthSchemas.login>) => void;
+  handleSignOut: () => void;
+  handleReset: (
+    values: z.infer<(typeof AuthSchemas)['reset-password']>
+  ) => void;
+};
+
+const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const navigate = useNavigate();
 
@@ -46,61 +59,81 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth]);
 
-  const handleSignUp = async (email: string, password: string) => {
-    setError(null);
+  const handleSignup = async (
+    values: z.infer<(typeof AuthSchemas)['sign-up']>
+  ) => {
     setIsLoading(true);
 
-    try {
-      const { user } = await createUserWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
+    const validatedFields = AuthSchemas['sign-up'].safeParse(values);
 
-      await setDoc(doc(db, 'users', user.uid), {});
+    if (validatedFields.success) {
+      const { email, password } = validatedFields.data;
 
-      setUser(user);
+      try {
+        const { user } = await createUserWithEmailAndPassword(
+          auth,
+          email,
+          password
+        );
 
-      navigate(-1);
+        await setDoc(doc(db, 'users', user.uid), {});
 
-      setIsLoading(false);
+        setUser(user);
 
-      sendEmailVerification(auth.currentUser as User);
-    } catch (err) {
-      setError(
-        'このメールアドレスはすでに登録されています。パスワードを忘れた場合は、「パスワードをお忘れですか？」をクリックしてリセットするか、新しいアカウントを作成してください。'
-      );
+        navigate('/dashboard');
 
-      if (err instanceof Error) {
-        console.log(err.message);
+        setIsLoading(false);
+
+        sendEmailVerification(auth.currentUser as User);
+      } catch (err) {
+        toast.error(
+          'このメールアドレスはすでに登録されています。パスワードを忘れた場合は、「パスワードをお忘れですか？」をクリックしてリセットするか、新しいアカウントを作成してください。'
+        );
+
+        if (err instanceof Error) {
+          console.log(err.message);
+        }
+
+        setIsLoading(false);
       }
-
-      setIsLoading(false);
+    } else {
+      console.error(validatedFields.error);
     }
   };
 
-  const handleSignIn = async (email: string, password: string) => {
-    setError(null);
+  const handleLogin = async (values: z.infer<typeof AuthSchemas.login>) => {
     setIsLoading(true);
 
-    try {
-      const { user } = await signInWithEmailAndPassword(auth, email, password);
+    const validatedFields = AuthSchemas.login.safeParse(values);
 
-      setUser(user);
+    if (validatedFields.success) {
+      const { email, password } = validatedFields.data;
 
-      navigate(-1);
+      try {
+        const { user } = await signInWithEmailAndPassword(
+          auth,
+          email,
+          password
+        );
 
-      setIsLoading(false);
-    } catch (err) {
-      setError(
-        'メールアドレスとパスワードの組み合わせが正しくありません。もう一度お試しいただくか、「パスワードをお忘れですか？」をクリックしてリセットしてください。'
-      );
+        setUser(user);
 
-      if (err instanceof Error) {
-        console.log(err.message);
+        navigate('/dashboard');
+
+        setIsLoading(false);
+      } catch (err) {
+        toast.error(
+          'メールアドレスとパスワードの組み合わせが正しくありません。もう一度お試しいただくか、「パスワードをお忘れですか？」をクリックしてリセットしてください。'
+        );
+
+        if (err instanceof Error) {
+          console.log(err.message);
+        }
+
+        setIsLoading(false);
       }
-
-      setIsLoading(false);
+    } else {
+      console.error(validatedFields.error);
     }
   };
 
@@ -124,42 +157,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const handleReset = async (email: string) => {
+  const handleReset = async (
+    values: z.infer<(typeof AuthSchemas)['reset-password']>
+  ) => {
     setIsLoading(true);
 
-    try {
-      await sendPasswordResetEmail(auth, email);
+    const validatedFields = AuthSchemas['reset-password'].safeParse(values);
 
-      setError(
-        'パスワードリセット用のリンクを送信しました。しばらくしても届かない場合は、迷惑メールフォルダを確認するか、もう一度お試しください。'
-      );
+    if (validatedFields.success) {
+      const { email } = validatedFields.data;
 
-      setIsLoading(false);
-    } catch (err) {
-      if (err instanceof Error) {
-        console.log(err.message);
+      try {
+        await sendPasswordResetEmail(auth, email);
+
+        toast.success(
+          'パスワードリセット用のリンクを送信しました。しばらくしても届かない場合は、迷惑メールフォルダを確認するか、もう一度お試しください。'
+        );
+
+        setIsLoading(false);
+      } catch (err) {
+        if (err instanceof Error) {
+          console.log(err.message);
+        }
+
+        setIsLoading(false);
       }
-
-      setIsLoading(false);
+    } else {
+      console.error(validatedFields.error);
     }
   };
 
-  const handleClearError = () => setError(null);
-
   const memoedValue = useMemo(
     () => ({
-      error,
       isLoading,
       user,
-      handleSignUp,
-      handleSignIn,
+      handleSignup,
+      handleLogin,
       handleSignOut,
       handleReset,
-      handleClearError,
     }),
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [error, isLoading, user]
+    [isLoading, user]
   );
 
   return (
@@ -169,5 +208,5 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 // eslint-disable-next-line react-refresh/only-export-components
 export default function useAuth() {
-  return useContext(AuthContext);
+  return useContext(AuthContext) as AuthContextType;
 }

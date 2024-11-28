@@ -42,6 +42,18 @@ const ResetPasswordSchema = BaseAuthSchema.omit({
 
 export const AuthSchemas = {
   login: LoginSchema,
-  signUp: SignupSchema,
-  resetPassword: ResetPasswordSchema,
+  ['sign-up']: SignupSchema,
+  ['reset-password']: ResetPasswordSchema,
 };
+
+export const TaskSchema = z.object({
+  title: z
+    .string()
+    .min(1, 'タイトルを入力してください。')
+    .max(256, 'タイトルは256文字以内である必要があります。'),
+
+  content: z
+    .string()
+    .min(1, '本文を入力してください。')
+    .max(4096, '本文は4096文字以内である必要があります。'),
+});
